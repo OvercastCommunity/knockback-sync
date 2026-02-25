@@ -1,8 +1,6 @@
 package me.caseload.knockbacksync.listener;
 
 import com.github.retrooper.packetevents.protocol.player.User;
-import com.github.retrooper.packetevents.protocol.world.states.WrappedBlockState;
-import com.github.retrooper.packetevents.protocol.world.states.type.StateTypes;
 import com.github.retrooper.packetevents.util.Vector3d;
 import me.caseload.knockbacksync.Base;
 import me.caseload.knockbacksync.manager.PlayerDataManager;
@@ -22,33 +20,14 @@ public abstract class PlayerKnockbackListener {
         if (victimPlayerData == null)
             return;
 
-        if (victimPlayerData.getNotNullPing() < PlayerData.PING_OFFSET)
-            return;
+        Vector3d hv = victimPlayerData.getHorizontalVelocity();
+        Vector3d adjustedVelocity = hv != null ? new Vector3d(hv.getX(), velocity.getY(), hv.getZ()) : velocity;
 
-        double distanceToGround = victimPlayerData.getDistanceToGround();
-        if (distanceToGround <= 0)
-            return; // minecraft already does the work for us
-
-        WrappedBlockState blockState = victim.getWorld().getBlockStateAt(victim.getLocation());
-        if (victim.isGliding() ||
-                blockState.getType() == StateTypes.WATER ||
-                blockState.getType() == StateTypes.LAVA ||
-                blockState.getType() == StateTypes.COBWEB ||
-                blockState.getType() == StateTypes.SCAFFOLDING)
-            return;
-
-        Vector3d adjustedVelocity;
-        if (victimPlayerData.isOnGroundClientSide(velocity.getY(), distanceToGround)) {
-            Integer damageTicks = victimPlayerData.getLastDamageTicks();
-            if (damageTicks != null && damageTicks > 8)
-                return;
-
-            adjustedVelocity = velocity.withY(victimPlayerData.getVerticalVelocity()); // Should be impossible to produce a NPE in this context
+        if (victimPlayerData.getNotNullPing() >= PlayerData.PING_OFFSET && victimPlayerData.isOffGroundSyncEnabled()) {
+            adjustedVelocity = adjustedVelocity.withY(victimPlayerData.getCompensatedOffGroundVelocity());
+        } else {
+            adjustedVelocity = adjustedVelocity.withY(victimPlayerData.getVerticalVelocity());
         }
-        else if (victimPlayerData.isOffGroundSyncEnabled())
-            adjustedVelocity = velocity.withY(victimPlayerData.getCompensatedOffGroundVelocity());
-        else
-            return;
 
         victim.setVelocity(adjustedVelocity);
     }
