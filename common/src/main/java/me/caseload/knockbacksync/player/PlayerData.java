@@ -83,6 +83,7 @@ public class PlayerData {
     @NotNull private final Object combatTaskLock = new Object(); // Lock object for synchronization
     @Nullable @Setter private Double ping, previousPing;
     @Nullable @Setter private Double verticalVelocity;
+    @Nullable @Setter private Vector3d horizontalVelocity;
     @Nullable @Setter private Integer lastDamageTicks;
     @Setter private double gravityAttribute = 0.08;
     @Setter private double knockbackResistanceAttribute = 0.0;
@@ -213,7 +214,7 @@ public class PlayerData {
      * @return Compensated Y axis velocity
      */
     public double getCompensatedOffGroundVelocity() {
-        return MathUtil.getCompensatedVerticalVelocity(platformPlayer.getVelocity().getY(), getGravityAttribute(), getTicks());
+        return MathUtil.getCompensatedVerticalVelocity(getVerticalVelocity(), getGravityAttribute(), getTicks());
     }
 
     /**
@@ -258,27 +259,61 @@ public class PlayerData {
         };
     }
 
-    /**
-     * Calculates the positive vertical velocity.
-     * This is used to switch falling knockback to rising knockback.
-     *
-     * @param attacker The player who is attacking.
-     * @return The calculated positive vertical velocity, consistent with vanilla behavior.
-     */
+    private static final double knockbackFriction = 2.0D;
+    private static final double knockbackHorizontal = 0.4D;
+    private static final double knockbackVertical = 0.4D;
+    private static final double knockbackVerticalLimit = 0.4D;
+    private static final double knockbackExtraHorizontal = 0.5D;
+    private static final double knockbackExtraVertical = 0.1D;
+
     public double calculateVerticalVelocity(PlatformPlayer attacker) {
-        double yAxis = attacker.getAttackCooldown() > 0.848 ? 0.4 : 0.36080000519752503;
+        double resistance = 1.0 - knockbackResistanceAttribute;
+        double yAxis = knockbackVertical * resistance;
 
-        if (!attacker.isSprinting()) {
-            yAxis = 0.36080000519752503;
-            double resistanceFactor = 0.04000000119 * knockbackResistanceAttribute * 10;
-            yAxis -= resistanceFactor;
-        }
+        int bonusKnockback = attacker.getMainHandKnockbackLevel();
+        if (attacker.isSprinting() && attacker.getAttackCooldown() > 0.848) bonusKnockback++;
 
-        // vertical velocity is always 0.4 when you have knockback level higher than 0
-        if (attacker.getMainHandKnockbackLevel() > 0)
-            yAxis = 0.4;
+        if (yAxis > knockbackVerticalLimit)
+            yAxis = knockbackVerticalLimit;
+
+        if (bonusKnockback > 0)
+            yAxis += knockbackExtraVertical * resistance;
 
         return yAxis;
+    }
+
+    public Vector3d calculateHorizontalVelocity(PlatformPlayer attacker) {
+        Vector3d victimPos = platformPlayer.getLocation();
+        Vector3d attackerPos = attacker.getLocation();
+        Vector3d currentVelocity = platformPlayer.getVelocity();
+
+        double d0 = attackerPos.getX() - victimPos.getX();
+        double d1 = attackerPos.getZ() - victimPos.getZ();
+
+        while (d0 * d0 + d1 * d1 < 1.0E-4D) {
+            d0 = (random.nextDouble() - random.nextDouble()) * 0.01D;
+            d1 = (random.nextDouble() - random.nextDouble()) * 0.01D;
+        }
+
+        double magnitude = Math.sqrt(d0 * d0 + d1 * d1);
+        double resistance = 1.0 - knockbackResistanceAttribute;
+
+        double frictionDivisor = knockbackFriction - knockbackResistanceAttribute;
+        double horizontalForce = knockbackHorizontal * resistance;
+
+        double x = (currentVelocity.getX() / frictionDivisor) - (d0 / magnitude * horizontalForce);
+        double z = (currentVelocity.getZ() / frictionDivisor) - (d1 / magnitude * horizontalForce);
+
+        int bonusKnockback = attacker.getMainHandKnockbackLevel();
+        if (attacker.isSprinting() && attacker.getAttackCooldown() > 0.848) bonusKnockback++;
+
+        if (bonusKnockback > 0) {
+            float yawRad = (float) Math.toRadians(attacker.getYaw());
+            x += -Math.sin(yawRad) * bonusKnockback * knockbackExtraHorizontal * resistance;
+            z +=  Math.cos(yawRad) * bonusKnockback * knockbackExtraHorizontal * resistance;
+        }
+
+        return new Vector3d(x, 0, z);
     }
 
     public void updateCombat() {
