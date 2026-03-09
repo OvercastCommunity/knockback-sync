@@ -283,6 +283,9 @@ public class PlayerData {
     }
 
     public Vector3d calculateHorizontalVelocity(PlatformPlayer attacker) {
+        if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThanOrEquals(ServerVersion.V_1_8_8))
+            return null;
+
         Vector3d victimPos = platformPlayer.getLocation();
         Vector3d attackerPos = attacker.getLocation();
         Vector3d currentVelocity = platformPlayer.getVelocity();

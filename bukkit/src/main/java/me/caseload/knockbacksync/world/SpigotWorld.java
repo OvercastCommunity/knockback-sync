@@ -80,6 +80,11 @@ public class SpigotWorld implements PlatformWorld {
     @Override
     public WrappedBlockState getBlockStateAt(int x, int y, int z) {
         Block block = world.getBlockAt(x, y, z);
+
+        if (PacketEvents.getAPI().getServerManager().getVersion().isOlderThanOrEquals(ServerVersion.V_1_8_8)) {
+            return SpigotConversionUtil.fromBukkitMaterialData(block.getState().getData());
+        }
+
         return SpigotConversionUtil.fromBukkitBlockData(block.getBlockData());
     }
 
@@ -121,22 +126,47 @@ public class SpigotWorld implements PlatformWorld {
                 if (hitResult == null) return null;
 
                 // Extract hit position and direction
-                Vector3d hitPosition = new Vector3d(
-                        (double) hitResult.getClass().getField("pos").get(hitResult),
-                        (double) hitResult.getClass().getField("pos").get(hitResult).getClass().getField("y").get(hitResult.getClass().getField("pos").get(hitResult)),
-                        (double) hitResult.getClass().getField("pos").get(hitResult).getClass().getField("z").get(hitResult.getClass().getField("pos").get(hitResult))
-                );
+                Vector3d hitPosition;
+                if (PacketEvents.getAPI().getServerManager().getVersion().equals(ServerVersion.V_1_12_2)) {
+                    hitPosition = new Vector3d(
+                            (double) hitResult.getClass().getField("pos").get(hitResult),
+                            (double) hitResult.getClass().getField("pos").get(hitResult).getClass().getField("y").get(hitResult.getClass().getField("pos").get(hitResult)),
+                            (double) hitResult.getClass().getField("pos").get(hitResult).getClass().getField("z").get(hitResult.getClass().getField("pos").get(hitResult))
+                    );
+                } else {
+                    Object posVec = hitResult.getClass().getField("pos").get(hitResult);
+                    hitPosition = new Vector3d(
+                            (double) posVec.getClass().getField("a").get(posVec),
+                            (double) posVec.getClass().getField("b").get(posVec),
+                            (double) posVec.getClass().getField("c").get(posVec)
+                    );
+                }
 
                 Object hitDirection = hitResult.getClass().getField("direction").get(hitResult);
-                Object hitBlock = hitResult.getClass().getField("e").get(hitResult); // e = BlockHitResult
+                Object hitBlock;
+
+                if (PacketEvents.getAPI().getServerManager().getVersion().equals(ServerVersion.V_1_12_2)) {
+                    hitBlock = hitResult.getClass().getField("e").get(hitResult);
+                } else {
+                    hitBlock = hitResult.getClass().getMethod("a").invoke(hitResult);
+                }
+
+                int bx, by, bz;
+                if (PacketEvents.getAPI().getServerManager().getVersion().equals(ServerVersion.V_1_12_2)) {
+                    bx = (int) hitBlock.getClass().getField("x").get(hitBlock);
+                    by = (int) hitBlock.getClass().getField("y").get(hitBlock);
+                    bz = (int) hitBlock.getClass().getField("z").get(hitBlock);
+                } else {
+                    bx = (int) hitBlock.getClass().getMethod("getX").invoke(hitBlock);
+                    by = (int) hitBlock.getClass().getMethod("getY").invoke(hitBlock);
+                    bz = (int) hitBlock.getClass().getMethod("getZ").invoke(hitBlock);
+                }
 
                 return new RayTraceResult(
                         hitPosition,
                         getHitBlockFace(hitDirection),
-                        new Vector3i((int) hitBlock.getClass().getField("x").get(hitBlock),
-                                (int) hitBlock.getClass().getField("y").get(hitBlock),
-                                (int) hitBlock.getClass().getField("z").get(hitBlock)),
-                        hitBlock != null ? WrappedBlockState.getByString(hitBlock.getClass().getField("type").get(hitBlock).toString()) : null
+                        new Vector3i(bx, by, bz),
+                        getBlockStateAt(bx, by, bz)
                 );
             } catch (Exception e) {
                 e.printStackTrace();

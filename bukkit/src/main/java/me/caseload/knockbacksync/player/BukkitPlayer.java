@@ -23,6 +23,7 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class BukkitPlayer implements PlatformPlayer {
     public final Player bukkitPlayer;
@@ -32,7 +33,7 @@ public class BukkitPlayer implements PlatformPlayer {
     // Reflection variables
     private static Class<?> craftPlayerClass;
     private static Method getHandleMethod;
-    private static Method getAttackStrengthScaleMethod;
+    private static @Nullable Method getAttackStrengthScaleMethod;
     private static final ServerVersion currentVersion = PacketEvents.getAPI().getServerManager().getVersion();
 
     // 1.12.2 support
@@ -50,22 +51,25 @@ public class BukkitPlayer implements PlatformPlayer {
                 craftPlayerClass = Class.forName(bukkitPackage + ".entity.CraftPlayer");
                 // Step 2: Get the getHandle method
                 getHandleMethod = craftPlayerClass.getMethod("getHandle");
-                // Step 3: Get the getAttackStrengthScale method from the EntityPlayer class
-                Class<?> entityPlayerClass = Class.forName(nmsPackage + ".EntityPlayer");
-                String getAttackStrengthScaleMethodName = "";
 
-                // Determine the method name based on the version
-                if (currentVersion.isOlderThan(ServerVersion.V_1_13)) {
-                    getAttackStrengthScaleMethodName = "n";
-                } else if (currentVersion.isOlderThan(ServerVersion.V_1_14)) {
-                    getAttackStrengthScaleMethodName = "r";
-                } else if (currentVersion.isOlderThan(ServerVersion.V_1_15)) {
-                    getAttackStrengthScaleMethodName = "s";
+                if (currentVersion.isNewerThan(ServerVersion.V_1_8_8)) {
+                    // Step 3: Get the getAttackStrengthScale method from the EntityPlayer class
+                    Class<?> entityPlayerClass = Class.forName(nmsPackage + ".EntityPlayer");
+                    String getAttackStrengthScaleMethodName = "";
+
+                    // Determine the method name based on the version
+                    if (currentVersion.isOlderThan(ServerVersion.V_1_13)) {
+                        getAttackStrengthScaleMethodName = "n";
+                    } else if (currentVersion.isOlderThan(ServerVersion.V_1_14)) {
+                        getAttackStrengthScaleMethodName = "r";
+                    } else if (currentVersion.isOlderThan(ServerVersion.V_1_15)) {
+                        getAttackStrengthScaleMethodName = "s";
+                    }
+
+                    // Get the attack strength scale method for EntityPlayer
+                    getAttackStrengthScaleMethod = entityPlayerClass.getMethod(getAttackStrengthScaleMethodName, float.class);
+                    getAttackStrengthScaleMethod.setAccessible(true);
                 }
-
-                // Get the attack strength scale method for EntityPlayer
-                getAttackStrengthScaleMethod = entityPlayerClass.getMethod(getAttackStrengthScaleMethodName, float.class);
-                getAttackStrengthScaleMethod.setAccessible(true);
             }
         } catch (ClassNotFoundException | NoSuchMethodException e) {
             throw new IllegalStateException("Method of Class required to support this version not found via reflection" + e);
@@ -137,6 +141,10 @@ public class BukkitPlayer implements PlatformPlayer {
 
     @Override
     public boolean isGliding() {
+        if (currentVersion.isOlderThanOrEquals(ServerVersion.V_1_8_8)) {
+            return false;
+        }
+
         return bukkitPlayer.isGliding();
     }
 
@@ -160,6 +168,8 @@ public class BukkitPlayer implements PlatformPlayer {
     public double getAttackCooldown() {
         if (currentVersion.isNewerThan(ServerVersion.V_1_14_4)) {
             return bukkitPlayer.getAttackCooldown();
+        } else if (currentVersion.isOlderThanOrEquals(ServerVersion.V_1_8_8)) {
+            return 1.0D;
         } else {
             try {
                 // Step 1: Get the CraftPlayer instance
@@ -180,6 +190,10 @@ public class BukkitPlayer implements PlatformPlayer {
 
     @Override
     public int getMainHandKnockbackLevel() {
+        if (currentVersion.isOlderThanOrEquals(ServerVersion.V_1_8_8)) {
+            return bukkitPlayer.getInventory().getItemInHand().getEnchantmentLevel(Enchantment.KNOCKBACK);
+        }
+
         return bukkitPlayer.getInventory().getItemInMainHand().getEnchantmentLevel(Enchantment.KNOCKBACK);
     }
 
@@ -201,6 +215,19 @@ public class BukkitPlayer implements PlatformPlayer {
 
     @Override
     public double getJumpPower() {
+        if (currentVersion.isOlderThanOrEquals(ServerVersion.V_1_8_8)) {
+            AtomicReference<Double> jumpVelocity = new AtomicReference<>(0.42);
+
+            bukkitPlayer.getActivePotionEffects().stream().filter(effect -> effect.getType() == PotionEffectType.JUMP).findAny().ifPresent(
+                    jumpEffect -> {
+                        int amplifier = jumpEffect.getAmplifier();
+                        jumpVelocity.updateAndGet(v -> v + (amplifier + 1) * 0.1F);
+                    }
+            );
+
+            return jumpVelocity.get();
+        }
+
         double jumpVelocity = 0.42;
 
         PotionEffect jumpEffect = bukkitPlayer.getPotionEffect(PotionEffectType.JUMP);
@@ -214,6 +241,17 @@ public class BukkitPlayer implements PlatformPlayer {
 
     @Override
     public BoundingBox getBoundingBox() {
+        if (currentVersion.isOlderThanOrEquals(ServerVersion.V_1_8_8)) {
+            double minX = bukkitPlayer.getLocation().getX() - 0.3;
+            double minY = bukkitPlayer.getLocation().getY();
+            double minZ = bukkitPlayer.getLocation().getZ() - 0.3;
+            double maxX = bukkitPlayer.getLocation().getX() + 0.3;
+            double maxY = bukkitPlayer.getLocation().getY() + 1.8;
+            double maxZ = bukkitPlayer.getLocation().getZ() + 0.3;
+
+            return new BoundingBox(minX, minY, minZ, maxX, maxY, maxZ);
+        }
+
         org.bukkit.util.BoundingBox boundingBox = bukkitPlayer.getBoundingBox();
         return new BoundingBox(boundingBox.getMinX(), boundingBox.getMinY(), boundingBox.getMinZ(), boundingBox.getMaxX(), boundingBox.getMaxY(), boundingBox.getMaxZ());
     }
