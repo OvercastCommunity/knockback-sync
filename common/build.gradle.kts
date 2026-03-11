@@ -8,8 +8,8 @@ dependencies {
     // True compileOnly deps
     compileOnly("org.geysermc.floodgate:api:2.0-SNAPSHOT")
     compileOnly("io.netty:netty-all:4.1.72.Final")
-    compileOnly("org.projectlombok:lombok:1.18.34")
-    annotationProcessor("org.projectlombok:lombok:1.18.34")
+    compileOnly("org.projectlombok:lombok:1.18.44")
+    annotationProcessor("org.projectlombok:lombok:1.18.44")
 
     // Shaded in or bundled by platform-specific code
     if (shadePE) {
@@ -25,7 +25,7 @@ dependencies {
     }
 
     implementation("org.incendo:cloud-core:2.0.0")
-    implementation("org.incendo:cloud-minecraft-extras:2.0.0-beta.10")
+    implementation("org.incendo:cloud-minecraft-extras:2.0.0-beta.14")
 }
 
 buildConfig {
