@@ -32,11 +32,12 @@ dependencies {
     implementation(project(":common"))
 
     compileOnly("org.spigotmc:spigot-api:1.18.2-R0.1-SNAPSHOT")
+    compileOnly("com.mojang:brigadier:1.0.18")
     compileOnly("org.geysermc.floodgate:api:2.0-SNAPSHOT")
     compileOnly("io.netty:netty-all:4.1.72.Final")
 
-    compileOnly("org.projectlombok:lombok:1.18.34")
-    annotationProcessor("org.projectlombok:lombok:1.18.34")
+    compileOnly("org.projectlombok:lombok:1.18.44")
+    annotationProcessor("org.projectlombok:lombok:1.18.44")
 
     shadeThisThing(implementation("org.kohsuke:github-api:1.326")!!)
     if (shadePE) {
