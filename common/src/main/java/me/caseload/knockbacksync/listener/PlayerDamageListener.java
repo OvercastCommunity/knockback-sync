@@ -18,6 +18,7 @@ public abstract class PlayerDamageListener {
         if (playerData == null)
             return;
 
+        playerData.setKnockbackResistanceAttribute(victim.getKnockbackResistance());
         playerData.setVerticalVelocity(playerData.calculateVerticalVelocity(attacker)); // do not move this calculation
         playerData.setLastDamageTicks(victim.getNoDamageTicks());
         playerData.updateCombat();
