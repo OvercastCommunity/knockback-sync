@@ -62,5 +62,7 @@ public interface PlatformPlayer {
     void setClientBrand(String brand);
 
     String getClientBrand();
+
+    double getKnockbackResistance();
     // Add more methods as needed
 }
