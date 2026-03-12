@@ -12,6 +12,7 @@ import me.caseload.knockbacksync.world.FoliaWorld;
 import me.caseload.knockbacksync.world.PlatformWorld;
 import me.caseload.knockbacksync.world.SpigotWorld;
 import org.bukkit.Bukkit;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
@@ -269,5 +270,11 @@ public class BukkitPlayer implements PlatformPlayer {
     @Override
     public String getClientBrand() {
         return this.clientBrand;
+    }
+
+    @Override
+    public double getKnockbackResistance() {
+        var attr = bukkitPlayer.getAttribute(Attribute.GENERIC_KNOCKBACK_RESISTANCE);
+        return attr != null ? attr.getValue() : 0.0;
     }
 }
